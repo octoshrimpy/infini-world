@@ -16,4 +16,6 @@ var config = {
   roundPixels: true
 }
 
+
+noise.seed(Math.random())
 let game = new Phaser.Game(config)

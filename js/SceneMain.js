@@ -23,9 +23,9 @@ class SceneMain extends Phaser.Scene {
     })
     */
   
-    this.chunkSize   = 16
+    this.chunkSize   = 4
     this.tileSize    = 16
-    this.cameraSpeed = 10
+    this.cameraSpeed = 20
 
     this.cameras.main.setZoom(0.5)
     let mainCam = this.cameras.main.worldView
@@ -35,7 +35,7 @@ class SceneMain extends Phaser.Scene {
       mainCam.y + (mainCam.height * 0.5)
     )
 
-    this.chunks = []
+    this.chunks = {}
     
     let inputKeeb  = this.input.keyboard
     let phaKeyCode = Phaser.Input.Keyboard.KeyCodes
@@ -45,16 +45,53 @@ class SceneMain extends Phaser.Scene {
     this.keyS  = inputKeeb.addKey(phaKeyCode.S)
     this.keyD  = inputKeeb.addKey(phaKeyCode.D)
   }
-  getChunk(x, y) {
-    let chunk = null
 
-    for (let i in [...Array(this.chunks.length)]) {
-      if (this.chunks[i].x == x && this.chunks[i].y == y) {
-        chunk = this.chunks[i]
+  getChunk(x, y) {
+    return this.chunks[`chunk_${x}_${y}`] || null
+  }
+
+  move() {
+    let chunkS = this.chunkSize
+    let tileS  = this.tileSize
+    let chuleS = chunkS * tileS
+    let follow = this.followPoint
+    let radius = 3
+
+    let snappedChunkX = chuleS * Math.round(follow.x / chuleS)
+    let snappedChunkY = chuleS * Math.round(follow.y / chuleS)
+
+    snappedChunkX = snappedChunkX / chunkS / tileS
+    snappedChunkY = snappedChunkY / chunkS / tileS
+
+    // generate vs load
+    for (let x = snappedChunkX - radius; x < snappedChunkX + radius; x++) {
+      for (let y = snappedChunkY - radius; y < snappedChunkY + radius; y++) {
+        let existingChunk = this.getChunk(x,y)
+        if(!existingChunk) {
+
+          let newChunk = new Chunk(this, x, y)
+          this.chunks[`newChunk_${x}_${y}`] = newChunk
+
+          // console.log(`generated [${newChunk.x}, ${newChunk.y}]`)
+        }
       }
     }
 
-    return chunk
+    // load unload chunks
+    for (let chunk of Object.values(this.chunks)) {
+
+      let distance = Phaser.Math.Distance.Between(
+        snappedChunkX,
+        snappedChunkY,
+        chunk.x,
+        chunk.y
+      )
+
+      distance < radius && chunk.load()
+      distance >= radius && chunk.unload()
+    }
+
+    return follow
   }
 
   update() {
@@ -72,19 +109,20 @@ class SceneMain extends Phaser.Scene {
 
     // generate vs load
     for (let x = snappedChunkX - radius; x < snappedChunkX + radius; x++) {
-      for (let y = snappedChunkY - radius; x < snappedChunkY + radius; x++) {
+      for (let y = snappedChunkY - radius; y < snappedChunkY + radius; y++) {
         let existingChunk = this.getChunk(x,y)
         if(!existingChunk) {
+
           let newChunk = new Chunk(this, x, y)
-          this.chunks.push(newChunk)
-          console.log('generated!')
+          this.chunks[`newChunk_${x}_${y}`] = newChunk
+
+          // console.log(`generated [${newChunk.x}, ${newChunk.y}]`)
         }
       }
     }
 
     // load unload chunks
-    for (let i in [...Array(this.chunks.length)]) {
-      let chunk = this.chunks[i]
+    for (let chunk of Object.values(this.chunks)) {
 
       let distance = Phaser.Math.Distance.Between(
         snappedChunkX,
@@ -93,12 +131,8 @@ class SceneMain extends Phaser.Scene {
         chunk.y
       )
 
-        
-      if (distance < radius + 2) {
-        !!chunk && chunk.load()
-      } else {
-        !!chunk && chunk.unload()
-      }
+      distance < radius && chunk.load()
+      distance >= radius && chunk.unload()
     }
 
     // camera movement
@@ -108,6 +142,6 @@ class SceneMain extends Phaser.Scene {
     if (this.keyS.isDown) { follow.y += this.cameraSpeed }
     if (this.keyD.isDown) { follow.x += this.cameraSpeed }
 
-    this.cameras.main.centerOn(follow.x, follow.y)
+    !!follow && this.cameras.main.centerOn(follow.x, follow.y)
   }
 }
