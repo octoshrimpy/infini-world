@@ -10,6 +10,11 @@ class SceneMain extends Phaser.Scene {
     this.load.image("sand",  "assets/sand.png")
     this.load.image("grass",  "assets/grass.png")
     this.load.image("forest", "assets/forest.png")
+    this.load.image("water_1", "assets/water_1.png")
+    this.load.image("water_shallow_1", "assets/water_shallow_1.png")
+    this.load.image("sand_1",  "assets/sand_1.png")
+    this.load.image("grass_1",  "assets/grass_1.png")
+    this.load.image("forest_1", "assets/forest_1.png")
 
   }
 
@@ -25,9 +30,9 @@ class SceneMain extends Phaser.Scene {
   
     this.chunkSize   = 4
     this.tileSize    = 16
-    this.cameraSpeed = 20
+    this.cameraSpeed = 10
 
-    this.cameras.main.setZoom(0.5)
+    this.cameras.main.setZoom(1)
     let mainCam = this.cameras.main.worldView
 
     this.followPoint = new Phaser.Math.Vector2(
@@ -35,7 +40,7 @@ class SceneMain extends Phaser.Scene {
       mainCam.y + (mainCam.height * 0.5)
     )
 
-    this.chunks = {}
+    this.chunks = []
     
     let inputKeeb  = this.input.keyboard
     let phaKeyCode = Phaser.Input.Keyboard.KeyCodes
@@ -44,104 +49,96 @@ class SceneMain extends Phaser.Scene {
     this.keyA  = inputKeeb.addKey(phaKeyCode.A)
     this.keyS  = inputKeeb.addKey(phaKeyCode.S)
     this.keyD  = inputKeeb.addKey(phaKeyCode.D)
+
+    this.updateMap()
   }
+
 
   getChunk(x, y) {
-    return this.chunks[`chunk_${x}_${y}`] || null
+    var chunk = null;
+    for (var i = 0; i < this.chunks.length; i++) {
+      if (this.chunks[i].x == x && this.chunks[i].y == y) {
+        chunk = this.chunks[i];
+      }
+    }
+    return chunk;
   }
 
-  move() {
-    let chunkS = this.chunkSize
-    let tileS  = this.tileSize
-    let chuleS = chunkS * tileS
+  updateMap() {
+
+    let radius = 6
+
     let follow = this.followPoint
-    let radius = 3
 
-    let snappedChunkX = chuleS * Math.round(follow.x / chuleS)
-    let snappedChunkY = chuleS * Math.round(follow.y / chuleS)
+    var snappedChunkX = (this.chunkSize * this.tileSize) * Math.round(follow.x / (this.chunkSize * this.tileSize));
+    var snappedChunkY = (this.chunkSize * this.tileSize) * Math.round(follow.y / (this.chunkSize * this.tileSize));
 
-    snappedChunkX = snappedChunkX / chunkS / tileS
-    snappedChunkY = snappedChunkY / chunkS / tileS
+    snappedChunkX = snappedChunkX / this.chunkSize / this.tileSize;
+    snappedChunkY = snappedChunkY / this.chunkSize / this.tileSize;
 
-    // generate vs load
-    for (let x = snappedChunkX - radius; x < snappedChunkX + radius; x++) {
-      for (let y = snappedChunkY - radius; y < snappedChunkY + radius; y++) {
-        let existingChunk = this.getChunk(x,y)
-        if(!existingChunk) {
+    for (var x = snappedChunkX - radius; x < snappedChunkX + radius; x++) {
+      for (var y = snappedChunkY - radius; y < snappedChunkY + radius; y++) {
+        var existingChunk = this.getChunk(x, y);
 
-          let newChunk = new Chunk(this, x, y)
-          this.chunks[`newChunk_${x}_${y}`] = newChunk
-
-          // console.log(`generated [${newChunk.x}, ${newChunk.y}]`)
+        if (existingChunk == null) {
+          var newChunk = new Chunk(this, x, y);
+          this.chunks.push(newChunk);
         }
       }
     }
 
-    // load unload chunks
-    for (let chunk of Object.values(this.chunks)) {
+    //@hack don't need to check every chunk, just ones
+    // with coords within radius of player
+    // can even be square radius
+    for (var i = 0; i < this.chunks.length; i++) {
+      var chunk = this.chunks[i];
 
-      let distance = Phaser.Math.Distance.Between(
+      if (Phaser.Math.Distance.Between(
         snappedChunkX,
         snappedChunkY,
         chunk.x,
         chunk.y
-      )
-
-      distance < radius && chunk.load()
-      distance >= radius && chunk.unload()
+      ) < radius) {
+        if (chunk !== null) {
+          chunk.load();
+        }
+      }
+      else {
+        if (chunk !== null) {
+          chunk.unload();
+        }
+      }
     }
 
     return follow
   }
 
   update() {
-    let chunkS = this.chunkSize
-    let tileS  = this.tileSize
-    let chuleS = chunkS * tileS
-    let follow = this.followPoint
-    let radius = 3
+    
+    let updateMapKeys = [
+      {key: this.keyW, move:[0,1]},
+      {key: this.keyS, move:[0,-1]},
+      {key: this.keyA, move:[-1,0]},
+      {key: this.keyD, move:[1,0]},
+    ]
 
-    let snappedChunkX = chuleS * Math.round(follow.x / chuleS)
-    let snappedChunkY = chuleS * Math.round(follow.y / chuleS)
+    let downKeys = updateMapKeys.filter(key => key.key.isDown)
+    let follow = !!downKeys && this.updateMap()
 
-    snappedChunkX = snappedChunkX / chunkS / tileS
-    snappedChunkY = snappedChunkY / chunkS / tileS
-
-    // generate vs load
-    for (let x = snappedChunkX - radius; x < snappedChunkX + radius; x++) {
-      for (let y = snappedChunkY - radius; y < snappedChunkY + radius; y++) {
-        let existingChunk = this.getChunk(x,y)
-        if(!existingChunk) {
-
-          let newChunk = new Chunk(this, x, y)
-          this.chunks[`newChunk_${x}_${y}`] = newChunk
-
-          // console.log(`generated [${newChunk.x}, ${newChunk.y}]`)
-        }
-      }
+    //@think this whole bit needs to be re-thought
+    if (this.keyW.isDown) {
+      follow.y -= this.cameraSpeed;
+    }
+    if (this.keyS.isDown) {
+      follow.y += this.cameraSpeed;
+    }
+    if (this.keyA.isDown) {
+      follow.x -= this.cameraSpeed;
+    }
+    if (this.keyD.isDown) {
+      follow.x += this.cameraSpeed;
     }
 
-    // load unload chunks
-    for (let chunk of Object.values(this.chunks)) {
-
-      let distance = Phaser.Math.Distance.Between(
-        snappedChunkX,
-        snappedChunkY,
-        chunk.x,
-        chunk.y
-      )
-
-      distance < radius && chunk.load()
-      distance >= radius && chunk.unload()
-    }
-
-    // camera movement
-
-    if (this.keyW.isDown) { follow.y -= this.cameraSpeed }
-    if (this.keyA.isDown) { follow.x -= this.cameraSpeed }
-    if (this.keyS.isDown) { follow.y += this.cameraSpeed }
-    if (this.keyD.isDown) { follow.x += this.cameraSpeed }
-
-    !!follow && this.cameras.main.centerOn(follow.x, follow.y)
+    this.cameras.main.centerOn(this.followPoint.x, this.followPoint.y);
   }
 }
