@@ -38,7 +38,7 @@ class Chunk {
         // let animKey = ""
         let key = ['water', 'water_1']
 
-        if (perlinVal > 0) {
+        if (perlinVal > 0.1) {
           key = ['water_shallow', 'water_shallow_1']
         }
         if (perlinVal > 2) {
